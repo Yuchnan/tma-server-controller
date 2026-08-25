@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import Docker from 'dockerode';
 import os from 'os';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 
@@ -17,6 +19,115 @@ const docker = new Docker(dockerOptions);
 
 app.use(cors());
 app.use(express.json());
+
+// Helper to get system / CPU temperature
+async function getSystemTemperature() {
+  const result = {
+    available: false,
+    main: null,
+    max: null,
+    sensors: [],
+    unit: '°C'
+  };
+
+  // 1. Try Linux /sys/class/thermal (standard Linux & mounted /sys)
+  try {
+    const thermalPath = '/sys/class/thermal';
+    if (fs.existsSync(thermalPath)) {
+      const entries = await fs.promises.readdir(thermalPath);
+      const zoneEntries = entries.filter(e => e.startsWith('thermal_zone'));
+
+      for (const zone of zoneEntries) {
+        try {
+          const tempFile = path.join(thermalPath, zone, 'temp');
+          const typeFile = path.join(thermalPath, zone, 'type');
+          if (fs.existsSync(tempFile)) {
+            const tempRaw = await fs.promises.readFile(tempFile, 'utf8');
+            let type = zone;
+            if (fs.existsSync(typeFile)) {
+              type = (await fs.promises.readFile(typeFile, 'utf8')).trim();
+            }
+
+            let tempVal = parseFloat(tempRaw.trim());
+            // Most kernels report millidegrees (e.g. 45000 = 45.0 C)
+            if (tempVal > 1000) {
+              tempVal = tempVal / 1000.0;
+            }
+
+            if (!isNaN(tempVal) && tempVal > 0 && tempVal < 150) {
+              result.sensors.push({
+                id: zone,
+                label: type,
+                temp: Number(tempVal.toFixed(1))
+              });
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch (e) {}
+
+  // 2. Try Linux /sys/class/hwmon (coretemp, k10temp, acpitz, etc.)
+  if (result.sensors.length === 0) {
+    try {
+      const hwmonPath = '/sys/class/hwmon';
+      if (fs.existsSync(hwmonPath)) {
+        const hwEntries = await fs.promises.readdir(hwmonPath);
+        for (const hw of hwEntries) {
+          const hwDir = path.join(hwmonPath, hw);
+          let hwName = hw;
+          try {
+            const nameFile = path.join(hwDir, 'name');
+            if (fs.existsSync(nameFile)) {
+              hwName = (await fs.promises.readFile(nameFile, 'utf8')).trim();
+            }
+          } catch {}
+
+          const files = await fs.promises.readdir(hwDir);
+          const tempInputs = files.filter(f => f.startsWith('temp') && f.endsWith('_input'));
+          for (const tFile of tempInputs) {
+            try {
+              const raw = await fs.promises.readFile(path.join(hwDir, tFile), 'utf8');
+              let tempVal = parseFloat(raw.trim());
+              if (tempVal > 1000) tempVal = tempVal / 1000.0;
+
+              const baseName = tFile.replace('_input', '');
+              let label = `${hwName} ${baseName}`;
+              try {
+                const labelFile = path.join(hwDir, `${baseName}_label`);
+                if (fs.existsSync(labelFile)) {
+                  const labelRaw = await fs.promises.readFile(labelFile, 'utf8');
+                  label = `${hwName} ${labelRaw.trim()}`;
+                }
+              } catch {}
+
+              if (!isNaN(tempVal) && tempVal > 0 && tempVal < 150) {
+                result.sensors.push({
+                  id: `${hw}_${baseName}`,
+                  label,
+                  temp: Number(tempVal.toFixed(1))
+                });
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Calculate main and max temperatures
+  if (result.sensors.length > 0) {
+    result.available = true;
+    const cpuSensor = result.sensors.find(s => 
+      /cpu|pkg|package|core|soc|k10temp|x86/i.test(s.label)
+    );
+    const temps = result.sensors.map(s => s.temp);
+    result.max = Math.max(...temps);
+    result.main = cpuSensor ? cpuSensor.temp : Number((temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1));
+  }
+
+  return result;
+}
 
 // Helper to clean docker multiplex headers from logs
 function sanitizeLogOutput(buffer) {
@@ -69,6 +180,7 @@ app.get('/api/system/stats', async (req, res) => {
     const cpuModel = cpus.length > 0 ? cpus[0].model : 'Unknown';
     const cpuCount = cpus.length;
     const loadAvg = os.loadavg();
+    const temperature = await getSystemTemperature();
 
     res.json({
       dockerAvailable,
@@ -78,6 +190,7 @@ app.get('/api/system/stats', async (req, res) => {
       platform: os.platform(),
       arch: os.arch(),
       osRelease: os.release(),
+      temperature,
       memory: {
         totalBytes: totalMem,
         usedBytes: usedMem,

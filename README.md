@@ -18,6 +18,7 @@ An ultra-modern, glassmorphic **Telegram Mini App (TMA)** and responsive Web Das
   - **Delete** containers with optional force remove for stopped or stuck instances.
   - State-aware glowing badges and live status indicators.
 - 📊 **Real-Time Homelab Metrics**:
+  - **Server / CPU Temperature Tracker** with dynamic color threshold badges (`Optimal`, `Normal`, `Warm`, `Hot`).
   - Host RAM usage gauge with visual threshold warnings (Green/Amber/Rose).
   - CPU Cores and live Load Average metrics.
   - Host uptime and Docker engine version tracker.

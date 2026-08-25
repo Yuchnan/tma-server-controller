@@ -1,5 +1,16 @@
 import React from 'react';
-import { Cpu, HardDrive, Boxes, Clock, PlayCircle, StopCircle, PauseCircle } from 'lucide-react';
+import { 
+  Cpu, 
+  HardDrive, 
+  Boxes, 
+  Clock, 
+  PlayCircle, 
+  StopCircle, 
+  PauseCircle,
+  Thermometer,
+  Flame,
+  CheckCircle2
+} from 'lucide-react';
 
 function formatBytes(bytes, decimals = 1) {
   if (!bytes || bytes === 0) return '0 B';
@@ -24,8 +35,8 @@ function formatUptime(seconds) {
 export default function SystemStats({ stats, containerCounts, loading }) {
   if (loading && !stats) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        {[1, 2, 3, 4].map(i => (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+        {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className="glass-panel p-4 rounded-2xl h-24 animate-pulse bg-slate-800/40 border border-slate-800"></div>
         ))}
       </div>
@@ -41,8 +52,23 @@ export default function SystemStats({ stats, containerCounts, loading }) {
   const memUsedStr = formatBytes(stats?.memory?.usedBytes);
   const memTotalStr = formatBytes(stats?.memory?.totalBytes);
 
+  // Temperature parsing
+  const temp = stats?.temperature;
+  const tempAvailable = Boolean(temp && temp.available && temp.main !== null);
+  const mainTemp = tempAvailable ? temp.main : null;
+
+  const getTempColor = (t) => {
+    if (!t) return { text: 'text-slate-400', badge: 'bg-slate-800 text-slate-400', label: 'N/A' };
+    if (t < 50) return { text: 'text-emerald-400', badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', label: 'Optimal' };
+    if (t < 70) return { text: 'text-cyan-400', badge: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30', label: 'Normal' };
+    if (t < 80) return { text: 'text-amber-400', badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30', label: 'Warm' };
+    return { text: 'text-rose-400', badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse', label: 'Hot!' };
+  };
+
+  const tempStyle = getTempColor(mainTemp);
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
       
       {/* 1. Containers Summary */}
       <div className="glass-panel p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between">
@@ -74,7 +100,54 @@ export default function SystemStats({ stats, containerCounts, loading }) {
         </div>
       </div>
 
-      {/* 2. Memory / RAM Usage */}
+      {/* 2. Server Temperature */}
+      <div className="glass-panel p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between">
+        <div className="flex items-center justify-between text-slate-400 mb-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">Server Temp</span>
+          {mainTemp && mainTemp >= 75 ? (
+            <Flame className="w-4 h-4 text-rose-400 animate-pulse" />
+          ) : (
+            <Thermometer className="w-4 h-4 text-cyan-400" />
+          )}
+        </div>
+        <div>
+          <div className="flex items-baseline justify-between gap-1">
+            <span className={`text-2xl font-bold tracking-tight ${tempStyle.text}`}>
+              {tempAvailable ? `${mainTemp}°C` : 'N/A'}
+            </span>
+            {tempAvailable && (
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${tempStyle.badge}`}>
+                {tempStyle.label}
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1 truncate">
+            {tempAvailable ? (
+              temp.max ? `Peak: ${temp.max}°C` : `${temp.sensors?.length || 1} sensor(s)`
+            ) : (
+              'Thermal zone inactive'
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Host CPU Cores / Load */}
+      <div className="glass-panel p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between">
+        <div className="flex items-center justify-between text-slate-400 mb-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">CPU Load</span>
+          <Cpu className="w-4 h-4 text-emerald-400" />
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-white tracking-tight">
+            {stats?.cpu?.cores || 1} <span className="text-xs font-normal text-slate-400">Cores</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1 font-mono truncate">
+            Load: {stats?.cpu?.loadAvg?.length ? stats.cpu.loadAvg.join(', ') : '0.00'}
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Memory / RAM Usage */}
       <div className="glass-panel p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between">
         <div className="flex items-center justify-between text-slate-400 mb-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">Host RAM</span>
@@ -96,24 +169,8 @@ export default function SystemStats({ stats, containerCounts, loading }) {
         </div>
       </div>
 
-      {/* 3. Host CPU Cores / Load */}
-      <div className="glass-panel p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between">
-        <div className="flex items-center justify-between text-slate-400 mb-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">CPU Load</span>
-          <Cpu className="w-4 h-4 text-emerald-400" />
-        </div>
-        <div>
-          <div className="text-2xl font-bold text-white tracking-tight">
-            {stats?.cpu?.cores || 1} <span className="text-xs font-normal text-slate-400">Cores</span>
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1 font-mono truncate">
-            Load: {stats?.cpu?.loadAvg?.length ? stats.cpu.loadAvg.join(', ') : '0.00'}
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Host Uptime & Docker Engine */}
-      <div className="glass-panel p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between">
+      {/* 5. Host Uptime & Docker Engine */}
+      <div className="glass-panel p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between col-span-2 md:col-span-1">
         <div className="flex items-center justify-between text-slate-400 mb-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">Uptime & Engine</span>
           <Clock className="w-4 h-4 text-amber-400" />
