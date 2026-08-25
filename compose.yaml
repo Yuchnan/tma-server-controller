@@ -7,12 +7,15 @@ services:
     restart: unless-stopped
     ports:
       - "4000:4000"
+    environment:
+      - PORT=4000
+      - DOCKER_SOCKET_PATH=/var/run/docker.sock
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     deploy:
       resources:
         limits:
-          memory: 200M
+          memory: 250M
 
   frontend:
     build:
@@ -22,6 +25,8 @@ services:
     restart: unless-stopped
     ports:
       - "3001:80"
+    depends_on:
+      - backend
     deploy:
       resources:
         limits:
