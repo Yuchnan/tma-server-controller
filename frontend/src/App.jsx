@@ -308,8 +308,8 @@ export default function App() {
                                         setStatusFilter(tab.id);
                                     }}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${isActive
-                                            ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
-                                            : 'bg-dark-900/80 text-slate-400 hover:text-slate-200 hover:bg-dark-850 border border-slate-800/80'
+                                        ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                                        : 'bg-dark-900/80 text-slate-400 hover:text-slate-200 hover:bg-dark-850 border border-slate-800/80'
                                         }`}
                                 >
                                     <Icon className={`w-3.5 h-3.5 ${tab.color}`} />
@@ -384,7 +384,7 @@ export default function App() {
                 <div className="flex flex-wrap items-center justify-center gap-2">
                     <span>TMA Server Controller</span>
                     <span>•</span>
-                    <span>Fast, Lightweight & Secure Homelab Docker Manager</span>
+                    <span>github.com/Yuchnan</span>
                 </div>
             </footer>
 
